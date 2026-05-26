@@ -40,7 +40,7 @@ export default function StudentList({ refresh }) {
     try {
       setLoading(true);
       const res = await api.get("/students");
-      setStudents(res.data?.data || res.data || []);
+      setStudents(Array.isArray(res.data) ? res.data : res.data?.data || []);
     } catch (err) {
       alert(err?.response?.data?.message || "Failed to load students");
     } finally {
@@ -57,7 +57,7 @@ export default function StudentList({ refresh }) {
     setImageFile(null);
 
     setForm({
-      full_name: student.full_name || "",
+      full_name: student.full_name || student.student_name || "",
       email: student.email || "",
       phone: student.phone || "",
       gender: student.gender || "",
@@ -77,10 +77,10 @@ export default function StudentList({ refresh }) {
   };
 
   const handleChange = (e) => {
-    setForm({
-      ...form,
+    setForm((prev) => ({
+      ...prev,
       [e.target.name]: e.target.value,
-    });
+    }));
   };
 
   const saveEdit = async (e) => {
@@ -90,7 +90,7 @@ export default function StudentList({ refresh }) {
       const formData = new FormData();
 
       Object.keys(form).forEach((key) => {
-        formData.append(key, form[key]);
+        formData.append(key, form[key] ?? "");
       });
 
       if (imageFile) {
@@ -114,51 +114,87 @@ export default function StudentList({ refresh }) {
   };
 
   const saveDropout = async (e) => {
-    e.preventDefault();
+  e.preventDefault();
 
-    if (!dropoutReason.trim()) {
-      return alert("Please enter dropout reason");
-    }
+  if (!dropoutStudent?.id) {
+    return alert("Student details are required");
+  }
 
-    const studentImage =
-      dropoutStudent.image ||
-      dropoutStudent.image_url ||
-      dropoutStudent.photo ||
-      dropoutStudent.photo_url ||
-      dropoutStudent.imageUrl ||
-      "";
+  if (!dropoutReason.trim()) {
+    return alert("Reason is required");
+  }
 
-    try {
-      await api.post("/dropout", {
-        student_id: dropoutStudent.id,
-        full_name: dropoutStudent.full_name,
-        email: dropoutStudent.email,
-        course: dropoutStudent.course,
-        reason: dropoutReason,
-        image: studentImage,
-      });
+  try {
+    const dropoutData = {
+      student_id: dropoutStudent.id,
+      full_name:
+        dropoutStudent.full_name ||
+        dropoutStudent.student_name ||
+        dropoutStudent.name ||
+        "",
+      email: dropoutStudent.email || "",
+      phone: dropoutStudent.phone || "",
+      gender: dropoutStudent.gender || "",
+      dob: dropoutStudent.dob || null,
+      nic: dropoutStudent.nic || "",
+      address:
+        dropoutStudent.address ||
+        dropoutStudent.permanent_address ||
+        dropoutStudent.current_address ||
+        "",
+      course: dropoutStudent.course || "",
+      qualification: dropoutStudent.qualification || "",
+      parent_name: dropoutStudent.parent_name || "",
+      parent_phone: dropoutStudent.parent_phone || "",
+      parent_address: dropoutStudent.parent_address || "",
+      guardian_name: dropoutStudent.guardian_name || "",
+      guardian_relation: dropoutStudent.guardian_relation || "",
+      guardian_phone: dropoutStudent.guardian_phone || "",
+      guardian_address: dropoutStudent.guardian_address || "",
+      image:
+        dropoutStudent.image ||
+        dropoutStudent.image_url ||
+        dropoutStudent.photo ||
+        dropoutStudent.photo_url ||
+        dropoutStudent.imageUrl ||
+        "",
+      reason: dropoutReason.trim(),
+    };
 
+    const res = await api.post("/dropout", dropoutData);
+
+    if (res.data?.success) {
       await api.delete(`/students/${dropoutStudent.id}`);
 
       setStudents((prev) =>
-        prev.filter((s) => s.id !== dropoutStudent.id)
+        prev.filter((student) => student.id !== dropoutStudent.id)
       );
 
-      alert("Student moved to dropout list");
+      alert("Student moved to dropout page");
 
       setDropoutStudent(null);
       setDropoutReason("");
-    } catch (err) {
-      alert(err?.response?.data?.message || "Failed to move student");
     }
-  };
+  } catch (err) {
+    console.log("Dropout Error:", err.response?.data || err.message);
+
+    alert(
+      err.response?.data?.message ||
+        "Failed to move student"
+    );
+  }
+};
 
   const remove = async (id) => {
-    if (!window.confirm("Delete this student permanently?")) return;
+    const confirmDelete = window.confirm("Delete this student permanently?");
+    if (!confirmDelete) return;
 
     try {
       await api.delete(`/students/${id}`);
-      setStudents((prev) => prev.filter((s) => s.id !== id));
+
+      setStudents((prev) => prev.filter((student) => student.id !== id));
+
+      alert("Student deleted permanently");
     } catch (err) {
       alert(err?.response?.data?.message || "Delete failed");
     }
@@ -182,7 +218,7 @@ export default function StudentList({ refresh }) {
   const courses = [...new Set(students.map((s) => s.course).filter(Boolean))];
 
   const filtered = students.filter((s) => {
-    const name = s.full_name || "";
+    const name = s.full_name || s.student_name || "";
     const email = s.email || "";
 
     const matchSearch =
@@ -223,6 +259,7 @@ export default function StudentList({ refresh }) {
             className="rounded-xl bg-slate-100 px-4 py-3 text-sm text-slate-900 outline-none dark:bg-slate-800 dark:text-white"
           >
             <option value="">All Courses</option>
+
             {courses.map((c) => (
               <option key={c} value={c}>
                 {c}
@@ -258,6 +295,8 @@ export default function StudentList({ refresh }) {
               ) : (
                 filtered.map((s, idx) => {
                   const imageSrc = getImageSrc(s);
+                  const studentName =
+                    s.full_name || s.student_name || s.name || "No Name";
 
                   return (
                     <tr
@@ -271,27 +310,27 @@ export default function StudentList({ refresh }) {
                           {imageSrc ? (
                             <img
                               src={imageSrc}
-                              alt={s.full_name || "Student"}
+                              alt={studentName}
                               className="h-10 w-10 rounded-full border border-slate-300 object-cover"
                             />
                           ) : (
                             <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-600 text-white">
-                              {s.full_name?.[0]?.toUpperCase() || "S"}
+                              {studentName?.[0]?.toUpperCase() || "S"}
                             </div>
                           )}
 
                           <div>
-                            <p className="font-semibold">
-                              {s.full_name || "No Name"}
-                            </p>
+                            <p className="font-semibold">{studentName}</p>
                             <p className="text-xs text-slate-400">#{s.id}</p>
                           </div>
                         </div>
                       </td>
 
                       <td className="px-5 py-4">
-                        <p>{s.email}</p>
-                        <p className="text-xs text-slate-400">{s.phone}</p>
+                        <p>{s.email || "-"}</p>
+                        <p className="text-xs text-slate-400">
+                          {s.phone || "-"}
+                        </p>
                       </td>
 
                       <td className="px-5 py-4">{s.course || "N/A"}</td>
@@ -300,6 +339,7 @@ export default function StudentList({ refresh }) {
                       <td className="px-5 py-4">
                         <div className="flex flex-wrap gap-2">
                           <button
+                            type="button"
                             onClick={() => openEdit(s)}
                             className="rounded-lg bg-blue-500 px-3 py-1 text-xs text-white hover:bg-blue-600"
                           >
@@ -307,6 +347,7 @@ export default function StudentList({ refresh }) {
                           </button>
 
                           <button
+                            type="button"
                             onClick={() => {
                               setDropoutStudent(s);
                               setDropoutReason("");
@@ -317,6 +358,7 @@ export default function StudentList({ refresh }) {
                           </button>
 
                           <button
+                            type="button"
                             onClick={() => remove(s.id)}
                             className="rounded-lg bg-red-500 px-3 py-1 text-xs text-white hover:bg-red-600"
                           >
@@ -345,13 +387,17 @@ export default function StudentList({ refresh }) {
 
             <div className="space-y-3 text-sm text-slate-700 dark:text-slate-300">
               <p>
-                <b>Name:</b> {dropoutStudent.full_name}
+                <b>Name:</b>{" "}
+                {dropoutStudent.full_name ||
+                  dropoutStudent.student_name ||
+                  dropoutStudent.name ||
+                  "No Name"}
               </p>
               <p>
-                <b>Email:</b> {dropoutStudent.email}
+                <b>Email:</b> {dropoutStudent.email || "-"}
               </p>
               <p>
-                <b>Course:</b> {dropoutStudent.course}
+                <b>Course:</b> {dropoutStudent.course || "-"}
               </p>
             </div>
 

@@ -6,6 +6,7 @@ import { PageTransition } from "../../animations/pageTransitions";
 const emptyForm = {
   title: "",
   code: "",
+  batch: "",
   duration: "",
   fee: "",
   description: "",
@@ -20,7 +21,7 @@ export default function Courses() {
   const loadCourses = async () => {
     try {
       const res = await api.get("/courses");
-      setCourses(res.data);
+      setCourses(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
       alert(err.response?.data?.message || "Failed to load courses");
     }
@@ -40,8 +41,8 @@ export default function Courses() {
   const submit = async (e) => {
     e.preventDefault();
 
-    if (!form.title || !form.code) {
-      return alert("Course Name and Course No are required");
+    if (!form.title || !form.code || !form.batch) {
+      return alert("Course Name, Course No and Batch are required");
     }
 
     try {
@@ -71,6 +72,7 @@ export default function Courses() {
     setForm({
       title: course.title || "",
       code: course.code || "",
+      batch: course.batch || "",
       duration: course.duration || "",
       fee: course.fee || "",
       description: course.description || "",
@@ -100,9 +102,7 @@ export default function Courses() {
     <PageTransition>
       <div className="space-y-6">
         <div>
-          <h1 className="text-2xl font-extrabold dark:text-white">
-            Courses
-          </h1>
+          <h1 className="text-2xl font-extrabold dark:text-white">Courses</h1>
           <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">
             Add, edit and delete course details.
           </p>
@@ -150,6 +150,15 @@ export default function Courses() {
 
             <input
               type="text"
+              name="batch"
+              value={form.batch}
+              onChange={handleChange}
+              placeholder="Enter Batch e.g. 2026-A"
+              className="w-full bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white p-3 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500"
+            />
+
+            <input
+              type="text"
               name="duration"
               value={form.duration}
               onChange={handleChange}
@@ -177,6 +186,7 @@ export default function Courses() {
           </div>
 
           <button
+            type="submit"
             disabled={loading}
             className={`mt-5 w-full ${
               editingId
@@ -205,6 +215,7 @@ export default function Courses() {
 
                 <div className="flex gap-2">
                   <button
+                    type="button"
                     onClick={() => startEdit(course)}
                     className="w-9 h-9 rounded-lg bg-yellow-100 text-yellow-600 flex items-center justify-center"
                   >
@@ -212,6 +223,7 @@ export default function Courses() {
                   </button>
 
                   <button
+                    type="button"
                     onClick={() => removeCourse(course.id)}
                     className="w-9 h-9 rounded-lg bg-red-100 text-red-600 flex items-center justify-center"
                   >
@@ -223,6 +235,12 @@ export default function Courses() {
               <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
                 <b>Course No:</b> {course.code}
               </p>
+
+              {course.batch && (
+                <p className="text-sm text-slate-500 dark:text-slate-400">
+                  <b>Batch:</b> {course.batch}
+                </p>
+              )}
 
               {course.duration && (
                 <p className="text-sm text-slate-500 dark:text-slate-400">

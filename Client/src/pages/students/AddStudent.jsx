@@ -11,7 +11,7 @@ const initialForm = {
   dob: "",
   nic: "",
   occupation: "",
-  course: "",
+  course: [],
   course_type: "",
   admission_date: "",
   qualification: "",
@@ -71,9 +71,21 @@ export default function AddStudent({
 
   useEffect(() => {
     if (editingStudent) {
+      let selectedCourses = [];
+
+      if (Array.isArray(editingStudent.course)) {
+        selectedCourses = editingStudent.course;
+      } else if (typeof editingStudent.course === "string") {
+        selectedCourses = editingStudent.course
+          .split(",")
+          .map((item) => item.trim())
+          .filter(Boolean);
+      }
+
       setForm({
         ...initialForm,
         ...editingStudent,
+        course: selectedCourses,
         full_name: editingStudent.full_name || editingStudent.student_name || "",
         agree_discontinue_fee:
           editingStudent.agree_discontinue_fee === true ||
@@ -105,6 +117,21 @@ export default function AddStudent({
     }));
   };
 
+  const handleCourseChange = (courseTitle) => {
+    setForm((prev) => {
+      const selected = prev.course || [];
+
+      const updatedCourses = selected.includes(courseTitle)
+        ? selected.filter((item) => item !== courseTitle)
+        : [...selected, courseTitle];
+
+      return {
+        ...prev,
+        course: updatedCourses,
+      };
+    });
+  };
+
   const handleImage = (e) => {
     const file = e.target.files[0];
 
@@ -133,13 +160,22 @@ export default function AddStudent({
   const submit = async (e) => {
     e.preventDefault();
 
+    if (!form.course || form.course.length === 0) {
+      alert("Please select at least one course");
+      return;
+    }
+
     try {
       setLoading(true);
 
       const fd = new FormData();
 
       Object.entries(form).forEach(([key, value]) => {
-        fd.append(key, value ?? "");
+        if (key === "course") {
+          fd.append("course", value.join(", "));
+        } else {
+          fd.append(key, value ?? "");
+        }
       });
 
       if (image) {
@@ -233,12 +269,11 @@ export default function AddStudent({
 
         <Section title="Course Information">
           <div className="grid gap-5 md:grid-cols-2">
-            <CourseSelectField
-              label="Selected Course"
-              name="course"
-              value={form.course}
-              onChange={handleChange}
+            <CourseCheckboxField
+              label="Selected Courses"
               courses={courses}
+              selectedCourses={form.course}
+              onChange={handleCourseChange}
             />
 
             <SelectField
@@ -363,6 +398,11 @@ export default function AddStudent({
   );
 }
 
+function RequiredStar({ required }) {
+  if (!required) return null;
+  return <span className="ml-1 text-red-500">*</span>;
+}
+
 function Section({ title, children }) {
   return (
     <section className="rounded-3xl border border-slate-800 bg-slate-900/60 p-5">
@@ -383,49 +423,118 @@ function Field({
   required = true,
   placeholder = "",
 }) {
+  const phoneFields = [
+    "phone",
+    "home_phone",
+    "father_phone",
+    "mother_phone",
+    "guardian_phone",
+  ];
+
+  const isPhoneField = phoneFields.includes(name);
+
+  const handleFieldChange = (e) => {
+    if (isPhoneField) {
+      const numbersOnly = e.target.value.replace(/[^0-9]/g, "").slice(0, 10);
+
+      onChange({
+        target: {
+          name,
+          value: numbersOnly,
+        },
+      });
+
+      return;
+    }
+
+    onChange(e);
+  };
+
   return (
     <div>
       <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-400">
         {label}
+        <RequiredStar required={required} />
       </label>
 
       <input
-        type={type}
+        type={isPhoneField ? "tel" : type}
         name={name}
         value={value || ""}
-        onChange={onChange}
+        onChange={handleFieldChange}
         required={required}
-        placeholder={placeholder}
+        placeholder={isPhoneField ? "0771234567" : placeholder}
+        minLength={isPhoneField ? 10 : undefined}
+        maxLength={isPhoneField ? 10 : undefined}
+        pattern={isPhoneField ? "[0-9]{10}" : undefined}
+        title={isPhoneField ? "Phone number must contain exactly 10 digits" : ""}
         className="w-full rounded-2xl border border-slate-700 bg-slate-950 p-4 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
       />
+
+      {isPhoneField && (
+        <p className="mt-1 text-xs text-slate-500">
+          Phone number must contain exactly 10 digits
+        </p>
+      )}
     </div>
   );
 }
 
-function CourseSelectField({ label, name, value, onChange, courses }) {
+function CourseCheckboxField({
+  label,
+  courses,
+  selectedCourses = [],
+  onChange,
+  required = true,
+}) {
   return (
     <div>
       <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-400">
         {label}
+        <RequiredStar required={required} />
       </label>
 
-      <select
-        name={name}
-        value={value || ""}
-        onChange={onChange}
-        required
-        className="w-full rounded-2xl border border-slate-700 bg-slate-950 p-4 text-sm text-white outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
-      >
-        <option value="">
-          {courses.length === 0 ? "No courses available" : "Select Course"}
-        </option>
+      <div className="max-h-56 overflow-y-auto rounded-2xl border border-slate-700 bg-slate-950 p-4">
+        {courses.length === 0 ? (
+          <p className="text-sm text-slate-500">No courses available</p>
+        ) : (
+          <div className="space-y-3">
+            {courses.map((course) => {
+              const title = course.title;
+              const checked = selectedCourses.includes(title);
 
-        {courses.map((course) => (
-          <option key={course.id} value={course.title}>
-            {course.title} {course.code ? `- ${course.code}` : ""}
-          </option>
-        ))}
-      </select>
+              return (
+                <label
+                  key={course.id}
+                  className={`flex cursor-pointer items-center justify-between rounded-xl border p-3 transition ${
+                    checked
+                      ? "border-blue-500 bg-blue-500/10 text-blue-300"
+                      : "border-slate-800 bg-slate-900 text-slate-300 hover:border-slate-600"
+                  }`}
+                >
+                  <div>
+                    <p className="text-sm font-bold">{course.title}</p>
+                    {course.code && (
+                      <p className="text-xs text-slate-500">{course.code}</p>
+                    )}
+                  </div>
+
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={() => onChange(title)}
+                    className="h-5 w-5 accent-blue-600"
+                  />
+                </label>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      <p className="mt-2 text-xs text-slate-500">
+        Selected: {selectedCourses.length} course(s)
+      </p>
     </div>
   );
 }
@@ -435,6 +544,7 @@ function SelectField({ label, name, value, onChange, options, required = true })
     <div>
       <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-400">
         {label}
+        <RequiredStar required={required} />
       </label>
 
       <select
@@ -461,6 +571,7 @@ function TextAreaField({ label, name, value, onChange, required = true }) {
     <div>
       <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-400">
         {label}
+        <RequiredStar required={required} />
       </label>
 
       <textarea

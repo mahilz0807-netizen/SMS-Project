@@ -1,13 +1,18 @@
 import { useEffect, useState } from "react";
-import { Search, Trash2, AlertTriangle, UserX } from "lucide-react";
+import { Search, ArrowLeft, AlertTriangle, UserX } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import api from "../../services/api";
 import Skeleton from "../../components/ui/Skeleton";
 
 const API_URL = "http://localhost:5000";
+const STUDENT_LIST_PATH = "/dashboard/students/records";
 
 export default function DropoutStudents() {
+  const navigate = useNavigate();
+
   const [dropouts, setDropouts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [restoreLoading, setRestoreLoading] = useState(null);
   const [search, setSearch] = useState("");
 
   const loadDropouts = async () => {
@@ -18,7 +23,8 @@ export default function DropoutStudents() {
 
       setDropouts(res.data?.data || []);
     } catch (err) {
-      alert(err?.response?.data?.message || "Failed to load dropout students");
+      console.error(err);
+      alert(err.response?.data?.message || "Failed to load dropout students");
     } finally {
       setLoading(false);
     }
@@ -28,26 +34,30 @@ export default function DropoutStudents() {
     loadDropouts();
   }, []);
 
-  const removeDropout = async (id) => {
-    if (!window.confirm("Delete this dropout record?")) return;
+  const restoreStudent = async (student) => {
+    if (!window.confirm("Move this student back to Student List?")) return;
 
     try {
-      await api.delete(`/dropout/${id}`);
-      setDropouts((prev) => prev.filter((d) => d.id !== id));
-      alert("Dropout record deleted");
+      setRestoreLoading(student.id);
+
+      await api.put(`/dropout/restore/${student.id}`);
+
+      alert("Student restored successfully");
+
+      setDropouts((prev) =>
+        prev.filter((item) => String(item.id) !== String(student.id))
+      );
+
+      navigate(STUDENT_LIST_PATH, { replace: true });
     } catch (err) {
-      alert(err?.response?.data?.message || "Delete failed");
+      alert(err.response?.data?.message || "Failed to restore student");
+    } finally {
+      setRestoreLoading(null);
     }
   };
 
   const getImageSrc = (d) => {
-    const img =
-      d.image ||
-      d.image_url ||
-      d.photo ||
-      d.photo_url ||
-      d.imageUrl ||
-      "";
+    const img = d.image || d.image_url || "";
 
     if (!img) return null;
     if (img.startsWith("http")) return img;
@@ -61,6 +71,7 @@ export default function DropoutStudents() {
     return (
       d.full_name?.toLowerCase().includes(keyword) ||
       d.email?.toLowerCase().includes(keyword) ||
+      d.phone?.toLowerCase().includes(keyword) ||
       d.course?.toLowerCase().includes(keyword) ||
       d.reason?.toLowerCase().includes(keyword)
     );
@@ -95,19 +106,19 @@ export default function DropoutStudents() {
               </h1>
 
               <p className="mt-1 text-sm text-white/80">
-                View and manage students marked as dropout.
+                Restore dropout students back to Student List.
               </p>
             </div>
           </div>
 
-          <div className="rounded-2xl border border-white/20 bg-white/10 px-6 py-4 text-center">
-            <p className="text-xs font-bold uppercase text-white/70">
-              Total Dropouts
-            </p>
-            <p className="text-3xl font-black text-white">
-              {filteredDropouts.length}
-            </p>
-          </div>
+          <button
+            type="button"
+            onClick={() => navigate(STUDENT_LIST_PATH, { replace: true })}
+            className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-6 py-3 text-sm font-black text-sky-700 shadow-lg transition hover:scale-105"
+          >
+            <ArrowLeft size={18} />
+            Back To Student List
+          </button>
         </div>
       </div>
 
@@ -120,7 +131,7 @@ export default function DropoutStudents() {
 
           <input
             type="text"
-            placeholder="Search by name, email, course or reason..."
+            placeholder="Search by name, email, phone, course or reason..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-4 pl-12 pr-4 text-sm text-slate-900 outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-white"
@@ -147,22 +158,21 @@ export default function DropoutStudents() {
             <tbody>
               {filteredDropouts.length === 0 ? (
                 <tr>
-                  <td colSpan="8" className="px-6 py-16 text-center">
+                  <td colSpan="9" className="px-6 py-16 text-center">
                     <AlertTriangle
                       size={34}
                       className="mx-auto mb-3 text-sky-600"
                     />
+
                     <h3 className="text-lg font-black text-slate-900 dark:text-white">
                       No dropout students found
                     </h3>
-                    <p className="text-sm text-slate-500">
-                      Dropout records will appear here after saving.
-                    </p>
                   </td>
                 </tr>
               ) : (
                 filteredDropouts.map((d, index) => {
                   const imageSrc = getImageSrc(d);
+                  const isRestoring = restoreLoading === d.id;
 
                   return (
                     <tr
@@ -181,7 +191,7 @@ export default function DropoutStudents() {
                             className="h-14 w-14 rounded-2xl border-2 border-sky-500 object-cover"
                           />
                         ) : (
-                          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-sky-500 text-white">
+                          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-sky-500 font-black text-white">
                             {d.full_name?.[0]?.toUpperCase() || "S"}
                           </div>
                         )}
@@ -197,9 +207,7 @@ export default function DropoutStudents() {
                       </td>
 
                       <td className="px-6 py-5 text-sm">{d.email || "-"}</td>
-
                       <td className="px-6 py-5">{d.course || "-"}</td>
-
                       <td className="px-6 py-5">{d.reason || "-"}</td>
 
                       <td className="px-6 py-5 text-sm">
@@ -210,11 +218,12 @@ export default function DropoutStudents() {
 
                       <td className="px-6 py-5">
                         <button
-                          onClick={() => removeDropout(d.id)}
-                          className="inline-flex items-center gap-2 rounded-xl bg-red-600 px-4 py-2 text-xs font-bold text-white hover:bg-red-700"
+                          type="button"
+                          disabled={isRestoring}
+                          onClick={() => restoreStudent(d)}
+                          className="inline-flex items-center gap-2 rounded-xl bg-green-600 px-4 py-2 text-xs font-bold text-white transition hover:bg-green-700 disabled:opacity-60"
                         >
-                          <Trash2 size={15} />
-                          Delete
+                          {isRestoring ? "Restoring..." : "Restore"}
                         </button>
                       </td>
                     </tr>

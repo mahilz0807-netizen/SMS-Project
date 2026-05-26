@@ -1,29 +1,23 @@
 import axios from "axios";
 
 const api = axios.create({
-  baseURL: "http://localhost:5000/api"
+  baseURL: "http://localhost:5000/api",
 });
 
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem("token");
+// Automatically add token to every request
+api.interceptors.request.use(
+  (config) => {
+    const token =
+      localStorage.getItem("token") ||
+      localStorage.getItem("adminToken");
 
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-
-  return config;
-});
-
-api.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
-      localStorage.removeItem("token");
-      localStorage.removeItem("admin");
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
     }
 
-    return Promise.reject(error);
-  }
+    return config;
+  },
+  (error) => Promise.reject(error)
 );
 
 export default api;

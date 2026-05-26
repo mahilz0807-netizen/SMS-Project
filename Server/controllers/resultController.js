@@ -1,6 +1,7 @@
 const supabase = require("../config/supabase");
 const { sendResultEmail } = require("../services/emailService");
 
+// ADD RESULT
 exports.addResult = async (req, res) => {
   try {
     const {
@@ -10,7 +11,7 @@ exports.addResult = async (req, res) => {
       subject,
       marks,
       grade,
-      semester,
+      batch,
     } = req.body;
 
     if (
@@ -19,8 +20,9 @@ exports.addResult = async (req, res) => {
       !student_email ||
       !subject ||
       marks === undefined ||
+      marks === "" ||
       !grade ||
-      !semester
+      !batch
     ) {
       return res.status(400).json({
         success: false,
@@ -33,10 +35,12 @@ exports.addResult = async (req, res) => {
       .insert([
         {
           student_id,
+          student_name,
+          student_email,
           subject,
           marks: Number(marks),
           grade,
-          semester,
+          batch,
         },
       ])
       .select();
@@ -48,11 +52,22 @@ exports.addResult = async (req, res) => {
       });
     }
 
-    await sendResultEmail(student_email, student_name, subject, marks, grade);
+    try {
+      await sendResultEmail(
+        student_email,
+        student_name,
+        subject,
+        marks,
+        grade,
+        batch
+      );
+    } catch (emailError) {
+      console.log("Result email error:", emailError.message);
+    }
 
     res.status(201).json({
       success: true,
-      message: "Result added and email sent successfully",
+      message: "Result added successfully",
       data,
     });
   } catch (error) {
@@ -65,6 +80,7 @@ exports.addResult = async (req, res) => {
   }
 };
 
+// GET RESULTS
 exports.getResults = async (req, res) => {
   try {
     const { data, error } = await supabase
@@ -88,6 +104,7 @@ exports.getResults = async (req, res) => {
   }
 };
 
+// DELETE RESULT
 exports.deleteResult = async (req, res) => {
   try {
     const { id } = req.params;

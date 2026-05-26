@@ -19,11 +19,11 @@ exports.getCourses = async (req, res) => {
 // ADD COURSE
 exports.addCourse = async (req, res) => {
   try {
-    const { title, code, duration, fee, description } = req.body;
+    const { title, code, batch, duration, fee, description } = req.body;
 
-    if (!title || !code) {
+    if (!title || !code || !batch) {
       return res.status(400).json({
-        message: "Course title and code are required",
+        message: "Course title, code and batch are required",
       });
     }
 
@@ -33,6 +33,7 @@ exports.addCourse = async (req, res) => {
         {
           title,
           code,
+          batch,
           duration,
           fee,
           description,
@@ -55,11 +56,11 @@ exports.addCourse = async (req, res) => {
 exports.updateCourse = async (req, res) => {
   try {
     const { id } = req.params;
-    const { title, code, duration, fee, description } = req.body;
+    const { title, code, batch, duration, fee, description } = req.body;
 
-    if (!title || !code) {
+    if (!title || !code || !batch) {
       return res.status(400).json({
-        message: "Course title and code are required",
+        message: "Course title, code and batch are required",
       });
     }
 
@@ -68,6 +69,7 @@ exports.updateCourse = async (req, res) => {
       .update({
         title,
         code,
+        batch,
         duration,
         fee,
         description,
